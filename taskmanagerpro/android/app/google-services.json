@@ -1,0 +1,49 @@
+{
+  "project_info": {
+    "project_number": "1051661515863",
+    "firebase_url": "https://mquang-ce72a-default-rtdb.firebaseio.com",
+    "project_id": "mquang-ce72a",
+    "storage_bucket": "mquang-ce72a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1051661515863:android:437eeb916c5a0f275d7712",
+        "android_client_info": {
+          "package_name": "com.example.doanapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB9uV7qvSb7-0O642Ctlol1qAcGT5tS34Q"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1051661515863:android:82d92d63ef31a6615d7712",
+        "android_client_info": {
+          "package_name": "com.example.quanlyghichu"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB9uV7qvSb7-0O642Ctlol1qAcGT5tS34Q"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
