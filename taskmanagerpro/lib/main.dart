@@ -2,10 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 import 'services/auth_service.dart';
 import 'services/task_service.dart';
 import 'services/theme_service.dart';
+import 'services/notification_service.dart';
+import 'models/notification_model.dart';
+
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/splash_screen.dart';
@@ -14,12 +19,26 @@ import 'firebase_options.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // ✅ Khởi tạo Firebase
+  // ✅ 1. Khởi tạo Firebase
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // ✅ Mỗi khi mở lại app → tự động đăng xuất user trước đó
+  // ✅ 2. Bật chế độ lưu cache offline của Firestore
+  FirebaseFirestore.instance.settings = const Settings(
+    persistenceEnabled: true,
+    cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+  );
+
+  // ✅ 3. Khởi tạo Hive (dùng để lưu lịch sử thông báo)
+  await Hive.initFlutter();
+  Hive.registerAdapter(AppNotificationAdapter());
+  await Hive.openBox<AppNotification>('notifications');
+
+  // ✅ 4. Khởi tạo NotificationService (sau khi Hive đã sẵn sàng)
+  await NotificationService.init();
+
+  // ✅ 5. Mỗi khi mở lại app → tự động đăng xuất user trước đó
   try {
     await FirebaseAuth.instance.signOut();
     debugPrint("Đã tự động đăng xuất user cũ khi khởi động app");
@@ -79,7 +98,7 @@ class _AppRoot extends StatelessWidget {
 
       home: const SplashScreen(),
 
-      // 🌞 Giao diện sáng (Light Mode)
+      // 🌞 Giao diện sáng
       theme: ThemeData(
         useMaterial3: true,
         colorSchemeSeed: Colors.indigo,
@@ -89,7 +108,7 @@ class _AppRoot extends StatelessWidget {
           foregroundColor: Colors.black,
           elevation: 1,
         ),
-        cardTheme: CardThemeData(
+        cardTheme: CardTheme(
           color: Colors.white,
           elevation: 3,
           shape: RoundedRectangleBorder(
@@ -106,7 +125,7 @@ class _AppRoot extends StatelessWidget {
         ),
       ),
 
-      // 🌙 Giao diện tối (Dark Mode)
+      // 🌙 Giao diện tối
       darkTheme: ThemeData(
         brightness: Brightness.dark,
         useMaterial3: true,
@@ -116,7 +135,7 @@ class _AppRoot extends StatelessWidget {
           backgroundColor: Color(0xFF1E1E1E),
           foregroundColor: Colors.white,
         ),
-        cardTheme: CardThemeData(
+        cardTheme: CardTheme(
           color: const Color(0xFF1E1E1E),
           elevation: 2,
           shape: RoundedRectangleBorder(
@@ -145,17 +164,13 @@ class Root extends StatelessWidget {
     final user = context.watch<User?>();
     final taskSrv = context.watch<TaskService?>();
 
-    // 🔸 Nếu chưa đăng nhập → chuyển về màn hình đăng nhập
     if (user == null) return const LoginScreen();
-
-    // 🔸 Nếu TaskService chưa sẵn sàng → hiển thị loading
     if (taskSrv == null) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       );
     }
 
-    // ✅ Khi đã đăng nhập → về HomeScreen
     return const HomeScreen();
   }
 }

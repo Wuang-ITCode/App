@@ -6,12 +6,14 @@ import 'package:fl_chart/fl_chart.dart';
 import '../models/task_model.dart';
 import '../services/task_service.dart';
 import '../services/auth_service.dart';
+import '../services/notification_service.dart';
 import '../widgets/task_tile.dart';
 import 'edit_task_screen.dart';
 import 'stats_screen.dart';
 import 'category_manager_screen.dart';
 import 'profile_screen.dart';
-import 'task_detail_screen.dart'; // ✅ Thêm import
+import 'task_detail_screen.dart';
+import '../screens/notification_history_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -36,17 +38,104 @@ class _HomeScreenState extends State<HomeScreen> {
     final taskSrv = context.watch<TaskService>();
     final df = DateFormat('dd/MM/yyyy HH:mm');
     final theme = Theme.of(context);
+    // 🔔 Khi mở app, hiển thị thông báo chưa đọc
+    final unread = NotificationService.getUnreadCount();
+    if (unread > 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: Colors.indigoAccent,
+            content: Text(
+              '🔔 Bạn có $unread thông báo mới chưa đọc!',
+              style: const TextStyle(color: Colors.white),
+            ),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      });
+    }
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
+
+      // 🌈 AppBar gọn, hiện đại
       appBar: AppBar(
-        title: const Text(
-          'Task Manager Pro',
-          style: TextStyle(fontWeight: FontWeight.bold),
+        title: null,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        automaticallyImplyLeading: false,
+        actionsIconTheme: const IconThemeData(color: Colors.white, size: 26),
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Colors.indigo.shade600, Colors.indigo.shade900],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.indigo.shade800.withOpacity(0.4),
+                blurRadius: 6,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
         ),
-        backgroundColor: theme.appBarTheme.backgroundColor,
-        elevation: 2,
         actions: [
+          // 🔍 Tìm kiếm dạng biểu tượng
+          IconButton(
+            tooltip: 'Tìm kiếm công việc',
+            icon: const Icon(Icons.search_rounded),
+            onPressed: () async {
+              final controller = TextEditingController();
+              await showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  backgroundColor: Colors.grey.shade900,
+                  title: const Text(
+                    'Tìm kiếm',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                  content: TextField(
+                    controller: controller,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: const InputDecoration(
+                      hintText: 'Nhập tiêu đề, mô tả hoặc tag...',
+                      hintStyle: TextStyle(color: Colors.white70),
+                      prefixIcon: Icon(Icons.search, color: Colors.white70),
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Đóng', style: TextStyle(color: Colors.white)),
+                    ),
+                    ElevatedButton(
+                      onPressed: () {
+                        setState(() {
+                          _searchC.text = controller.text.trim();
+                        });
+                        Navigator.pop(context);
+                      },
+                      child: const Text('Tìm'),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+
+          IconButton(
+            tooltip: 'Lịch sử thông báo',
+            icon: const Icon(Icons.notifications_rounded),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const NotificationHistoryScreen()),
+              );
+            },
+          ),
           IconButton(
             tooltip: 'Thống kê chi tiết',
             icon: const Icon(Icons.bar_chart_rounded),
@@ -88,63 +177,44 @@ class _HomeScreenState extends State<HomeScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // 🔹 Thanh tìm kiếm và bộ lọc
+            // 🔹 Bộ lọc danh mục và trạng thái
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
                   children: [
-                    SizedBox(
-                      width: 220,
-                      child: TextField(
-                        controller: _searchC,
-                        decoration: InputDecoration(
-                          hintText: 'Tìm kiếm tiêu đề, mô tả, tag…',
-                          prefixIcon: const Icon(Icons.search),
-                          filled: true,
-                          fillColor: theme.inputDecorationTheme.fillColor,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
-                          ),
-                        ),
-                        onChanged: (_) => setState(() {}),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-
                     // 🔹 Danh mục
                     StreamBuilder<List<String>>(
                       stream: taskSrv.watchCategories(),
                       builder: (context, snapshot) {
                         final categories = snapshot.data ?? [];
-                        if (categoryFilter != null && !categories.contains(categoryFilter)) {
+                        if (categoryFilter != null &&
+                            !categories.contains(categoryFilter)) {
                           WidgetsBinding.instance.addPostFrameCallback((_) {
-                            if (mounted) {
-                              setState(() => categoryFilter = null);
-                            }
+                            if (mounted) setState(() => categoryFilter = null);
                           });
                         }
 
                         return DropdownButton<String>(
-                          value: categoryFilter != null && categories.contains(categoryFilter)
-                              ? categoryFilter
-                              : null,
+                          value: categoryFilter,
                           hint: const Text('Danh mục'),
                           dropdownColor: theme.cardColor,
                           items: categories
-                              .map((cat) => DropdownMenuItem(
-                            value: cat,
-                            child: Text(cat),
-                          ))
+                              .map(
+                                (cat) => DropdownMenuItem(
+                              value: cat,
+                              child: Text(cat),
+                            ),
+                          )
                               .toList(),
                           onChanged: (v) => setState(() => categoryFilter = v),
                         );
                       },
                     ),
-
                     const SizedBox(width: 8),
+
+                    // 🔹 Thêm danh mục nhanh
                     IconButton(
                       icon: const Icon(Icons.add),
                       tooltip: 'Thêm danh mục',
@@ -157,7 +227,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             title: const Text('Thêm danh mục'),
                             content: TextField(
                               controller: controller,
-                              decoration: const InputDecoration(hintText: 'Nhập tên danh mục'),
+                              decoration: const InputDecoration(
+                                hintText: 'Nhập tên danh mục',
+                              ),
                             ),
                             actions: [
                               TextButton(
@@ -168,7 +240,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                 onPressed: () async {
                                   final name = controller.text.trim();
                                   if (name.isNotEmpty) {
-                                    await context.read<TaskService>().addCategoryIfNotExists(name);
+                                    await context
+                                        .read<TaskService>()
+                                        .addCategoryIfNotExists(name);
                                   }
                                   if (context.mounted) Navigator.pop(context);
                                 },
@@ -192,8 +266,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       ],
                       onChanged: (v) => setState(() => statusFilter = v),
                     ),
-
                     const SizedBox(width: 8),
+
+                    // 🔹 Xóa lọc
                     IconButton(
                       tooltip: 'Xóa lọc',
                       icon: const Icon(Icons.filter_alt_off_rounded),
@@ -230,10 +305,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   return ListView.separated(
                     padding: const EdgeInsets.only(bottom: 120),
-                    separatorBuilder: (_, __) => Divider(
-                      height: 0,
-                      color: theme.dividerColor,
-                    ),
+                    separatorBuilder: (_, __) =>
+                        Divider(height: 0, color: theme.dividerColor),
                     itemCount: tasks.length,
                     itemBuilder: (_, i) {
                       final t = tasks[i];
@@ -241,28 +314,28 @@ class _HomeScreenState extends State<HomeScreen> {
                         task: t,
                         subtitle: [
                           if (t.deadline != null) 'Hạn: ${df.format(t.deadline!)}',
-                          if ((t.category ?? '').isNotEmpty) 'Danh mục: ${t.category}',
+                          if ((t.category ?? '').isNotEmpty)
+                            'Danh mục: ${t.category}',
                           if (t.tags.isNotEmpty) 'Tag: ${t.tags.join(", ")}',
                         ].join(' • '),
                         onToggle: () => taskSrv.toggleDone(t),
                         onEdit: () async {
                           await Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (_) => EditTaskScreen(existing: t)),
+                            MaterialPageRoute(
+                              builder: (_) => EditTaskScreen(existing: t),
+                            ),
                           );
                         },
                         onDelete: () => taskSrv.deleteTask(t.id),
-
-                        // ✅ Khi nhấn vào công việc -> mở chi tiết
                         onTap: () {
                           Navigator.push(
                             context,
                             PageRouteBuilder(
-                              pageBuilder: (_, __, ___) => TaskDetailScreen(task: t),
-                              transitionsBuilder: (_, anim, __, child) => FadeTransition(
-                                opacity: anim,
-                                child: child,
-                              ),
+                              pageBuilder: (_, __, ___) =>
+                                  TaskDetailScreen(task: t),
+                              transitionsBuilder: (_, anim, __, child) =>
+                                  FadeTransition(opacity: anim, child: child),
                             ),
                           );
                         },
@@ -371,7 +444,6 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
 
-      // 🔹 FAB
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {

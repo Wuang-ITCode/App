@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../models/task_model.dart';
 import '../services/task_service.dart';
+import '../services/notification_service.dart'; // ✅ Thêm import
 
 class EditTaskScreen extends StatefulWidget {
   final TaskModel? existing;
@@ -82,9 +83,10 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
     final category = _categoryC.text.trim().isEmpty ? null : _categoryC.text.trim();
 
     try {
+      late TaskModel t;
       if (widget.existing == null) {
         // 🆕 Thêm công việc mới
-        final t = TaskModel(
+        t = TaskModel(
           id: '_', // Firestore sẽ tự tạo ID
           title: _titleC.text.trim(),
           description: _descC.text.trim().isEmpty ? null : _descC.text.trim(),
@@ -98,24 +100,37 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
         await srv.addTask(t);
       } else {
         // ✏️ Cập nhật công việc cũ
-        final t = widget.existing!;
-        final updated = TaskModel(
-          id: t.id,
+        final old = widget.existing!;
+        t = TaskModel(
+          id: old.id,
           title: _titleC.text.trim(),
           description: _descC.text.trim().isEmpty ? null : _descC.text.trim(),
           deadline: _deadline,
           category: category,
           tags: tags,
-          isDone: t.isDone,
-          createdAt: t.createdAt,
+          isDone: old.isDone,
+          createdAt: old.createdAt,
           updatedAt: now,
         );
-        await srv.updateTask(updated);
+        await srv.updateTask(t);
       }
 
       // 🔸 Nếu có nhập danh mục mới thì thêm vào Firestore (tránh trùng)
       if (category != null && category.isNotEmpty) {
         await srv.addCategoryIfNotExists(category);
+      }
+
+      // 🔔 Lên lịch thông báo nếu có deadline
+      if (_deadline != null && _deadline!.isAfter(DateTime.now())) {
+        final notifyTime = _deadline!.subtract(const Duration(minutes: 10));
+        await NotificationService.schedule(
+          title: 'Nhắc việc: ${_titleC.text.trim()}',
+          body:
+          'Sắp đến hạn vào ${DateFormat('HH:mm dd/MM/yyyy').format(_deadline!)}',
+          time: notifyTime.isBefore(DateTime.now())
+              ? DateTime.now().add(const Duration(seconds: 10))
+              : notifyTime,
+        );
       }
 
       if (mounted) {
@@ -184,7 +199,7 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
             TextField(
               controller: _tagsC,
               decoration: const InputDecoration(
-                labelText: 'Tag (phân cách bằng dấu phẩy, VD: gấp,rà soát)',
+                labelText: 'Tag (phân cách bằng dấu phẩy, VD: gấp, rà soát)',
                 border: OutlineInputBorder(),
               ),
             ),
